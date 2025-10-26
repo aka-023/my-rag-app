@@ -1,0 +1,15 @@
+# Streamlit for web interface
+streamlit
+
+# Vector database - using version with pre-built wheels
+chromadb
+
+# Google Gemini API
+google-genai
+
+# Document processing
+pypdf
+python-docx
+
+# Environment variables
+python-dotenv
