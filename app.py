@@ -1,3 +1,5 @@
+import os
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import streamlit as st
 from document_processor import extract_text_from_file
 from rag_engine import setup_rag_pipeline, query_document
