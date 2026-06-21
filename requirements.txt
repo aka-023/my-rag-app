@@ -1,15 +1,8 @@
-# Streamlit for web interface
 streamlit
-
-# Vector database - using version with pre-built wheels
 chromadb
-
-# Google Gemini API
+opentelemetry-exporter-otlp-proto-grpc>=1.40
+opentelemetry-proto>=1.40
 google-genai
-
-# Document processing
 pypdf
 python-docx
-
-# Environment variables
 python-dotenv

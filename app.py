@@ -4,178 +4,177 @@ from rag_engine import setup_rag_pipeline, query_document
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
-# Page configuration
+# Page Configuration
 st.set_page_config(
-    page_title="RAG Document Q&A",
+    page_title="DocuMind AI - Document Q&A",
     page_icon="📄",
-    layout="centered"
+    layout="wide"
 )
 
-# Initialize session state
+# Professional Minimalist UI Styling
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* Smooth sidebar styling */
+    .stSidebar {
+        background-color: #f8f9fa;
+        border-right: 1px solid #e9ecef;
+    }
+    
+    /* Custom section labels for sidebar */
+    .sidebar-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #6c757d;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Clean chat message tweaks */
+    .stChatMessage {
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.8rem;
+    }
+    
+    /* Hide default header/footer menu fluff */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+# Initialize Session States
 if 'collection' not in st.session_state:
     st.session_state.collection = None
-if 'qa_history' not in st.session_state:
-    st.session_state.qa_history = []
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
 if 'document_name' not in st.session_state:
     st.session_state.document_name = None
 if 'chunk_count' not in st.session_state:
     st.session_state.chunk_count = 0
 
 def reset_session():
-    """Reset session state for new document upload"""
     st.session_state.collection = None
-    st.session_state.qa_history = []
+    st.session_state.messages = []
     st.session_state.document_name = None
     st.session_state.chunk_count = 0
 
-# App Header
-st.title("📄 RAG Document Q&A System")
-st.markdown("Upload a document and ask questions about its content!")
-
-# Sidebar for API Key
+# --- SIDEBAR PANEL (Controls & Upload) ---
 with st.sidebar:
-    st.header("⚙️ Configuration")
-    api_key = st.text_input(
-        "Google Gemini API Key",
-        type="password",
-        value=os.getenv("GOOGLE_API_KEY", ""),
-        help="Enter your Google Gemini API key"
-    )
+    st.markdown("<h1>📄 <span style='color:black;'>DocuMind AI</span></h1>", unsafe_allow_html=True)  
+    st.markdown("<p style='color:black; font-size: 0.95em; opacity: 0.8;'>Intelligent RAG-powered document exploration.</p>", unsafe_allow_html=True)  
     
+    # 1. API Key Configuration
+    st.markdown('<div class="sidebar-label">API Configuration</div>', unsafe_allow_html=True)
+    try:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+    except Exception:
+        api_key = os.getenv("GOOGLE_API_KEY", "")
+
     if api_key:
         os.environ["GOOGLE_API_KEY"] = api_key
-        st.success("✅ API Key set")
+        st.success("Gemini API Key Connected", icon="⚡")
     else:
-        st.warning("⚠️ Please enter your API key")
-    
+        api_key_input = st.text_input("Enter Google API Key", type="password")
+        if api_key_input:
+            os.environ["GOOGLE_API_KEY"] = api_key_input
+            st.rerun()
+        else:
+            st.error("API key missing. Provide it above or via environment variables.")
+            st.stop()
+
     st.markdown("---")
-    st.markdown("### About")
-    st.info("This app uses RAG (Retrieval Augmented Generation) to answer questions based on your uploaded document.")
-    
+
+    # 2. Document Upload Section
+    st.markdown('<div class="sidebar-label">Document Upload</div>', unsafe_allow_html=True)
+    uploaded_file = st.file_uploader(
+        "Upload workspace source",
+        type=['pdf', 'txt', 'docx'],
+        help="Supported formats: PDF, TXT, DOCX (Max 10MB)",
+        label_visibility="collapsed"
+    )
+
+    if uploaded_file is not None:
+        if uploaded_file.size > 10 * 1024 * 1024:
+            st.error("File size exceeds 10MB limit.")
+        else:
+            # Check if this is a newly uploaded file
+            if st.session_state.document_name != uploaded_file.name:
+                with st.spinner("Analyzing and embedding document..."):
+                    try:
+                        document_text = extract_text_from_file(uploaded_file)
+                        
+                        if not document_text or len(document_text.strip()) < 50:
+                            st.error("Document content insufficient or parsing failed.")
+                        else:
+                            # Fresh file means fresh session context
+                            reset_session()
+                            collection, chunk_count = setup_rag_pipeline(document_text, os.getenv("GOOGLE_API_KEY"))
+                            st.session_state.collection = collection
+                            st.session_state.document_name = uploaded_file.name
+                            st.session_state.chunk_count = chunk_count
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Processing error: {str(e)}")
+
+    # 3. Active Document Status & Control
     if st.session_state.document_name:
         st.markdown("---")
-        st.markdown("### Current Document")
-        st.write(f"📄 **{st.session_state.document_name}**")
-        st.write(f"📊 Chunks: {st.session_state.chunk_count}")
+        st.markdown('<div class="sidebar-label">Active Knowledge Source</div>', unsafe_allow_html=True)
+        st.info(f"**{st.session_state.document_name}**\n\n🧩 {st.session_state.chunk_count} semantic chunks indexed.")
+        
+        if st.button("Unload Document", type="secondary", use_container_width=True):
+            reset_session()
+            st.rerun()
+            
+    # Clear conversation thread separately if wanted
+    if len(st.session_state.messages) > 0:
+        if st.button("Clear Chat History", type="primary", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
 
-# Main content area
-st.markdown("---")
+# --- MAIN CHAT INTERFACE ---
+st.header("Document Discussion Workspace", divider="gray")
 
-# File Upload Section
-st.header("1️⃣ Upload Document")
-uploaded_file = st.file_uploader(
-    "Choose a file",
-    type=['pdf', 'txt', 'docx'],
-    help="Supported formats: PDF, TXT, DOCX (Max 10MB)"
-)
-
-if uploaded_file is not None:
-    # Check file size (10MB limit)
-    if uploaded_file.size > 10 * 1024 * 1024:
-        st.error("❌ File too large! Maximum size is 10MB.")
-    else:
-        # Check if it's a new file
-        if st.session_state.document_name != uploaded_file.name:
-            with st.spinner("🔄 Processing document..."):
-                try:
-                    # Extract text from file
-                    document_text = extract_text_from_file(uploaded_file)
-                    
-                    if not document_text or len(document_text.strip()) < 50:
-                        st.error("❌ Document appears to be empty or too short. Please upload a valid document.")
-                    else:
-                        # Reset session for new document
-                        reset_session()
-                        
-                        # Setup RAG pipeline
-                        collection, chunk_count = setup_rag_pipeline(document_text)
-                        
-                        # Update session state
-                        st.session_state.collection = collection
-                        st.session_state.document_name = uploaded_file.name
-                        st.session_state.chunk_count = chunk_count
-                        
-                        st.success(f"✅ Document processed successfully! Split into {chunk_count} chunks.")
-                        st.balloons()
-                
-                except Exception as e:
-                    st.error(f"❌ Error processing document: {str(e)}")
-
-# Display document status
-if st.session_state.collection is not None:
-    st.info(f"📄 **Current Document:** {st.session_state.document_name} | **Chunks:** {st.session_state.chunk_count}")
-    
-    # Button to upload new document
-    if st.button("🔄 Clear & Upload New Document"):
-        reset_session()
-        st.rerun()
-
-st.markdown("---")
-
-# Query Section
-st.header("2️⃣ Ask Questions")
-
+# Direct user to upload file if empty state
 if st.session_state.collection is None:
-    st.warning("⚠️ Please upload a document first before asking questions.")
-    st.stop()
+    st.info("Welcome! Please upload a PDF, TXT, or DOCX document in the sidebar panel to start analyzing.", icon="ℹ️")
+else:
+    # Display the current file being queried contextually at the top
+    st.caption(f"Conversing with: `{st.session_state.document_name}`")
 
-# Check if API key is set
-if not os.getenv("GOOGLE_API_KEY"):
-    st.error("❌ Please set your Google Gemini API key in the sidebar.")
-    st.stop()
+    # Display conversational thread history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-# Query input
-with st.form(key="query_form"):
-    user_query = st.text_area(
-        "Enter your question:",
-        height=100,
-        placeholder="e.g., What is the main topic of this document?"
-    )
-    submit_button = st.form_submit_button("🔍 Get Answer")
-
-if submit_button and user_query.strip():
-    with st.spinner("🤔 Thinking..."):
-        try:
-            answer = query_document(
-                st.session_state.collection,
-                user_query,
-                os.getenv("GOOGLE_API_KEY")
-            )
-            
-            # Add to history
-            st.session_state.qa_history.append({
-                "question": user_query,
-                "answer": answer
-            })
-            
-        except Exception as e:
-            st.error(f"❌ Error generating answer: {str(e)}")
-
-# Display Q&A History
-if st.session_state.qa_history:
-    st.markdown("---")
-    st.header("💬 Q&A History")
-    
-    # Display in reverse order (newest first)
-    for i, qa in enumerate(reversed(st.session_state.qa_history)):
-        with st.container():
-            st.markdown(f"**Q{len(st.session_state.qa_history) - i}:** {qa['question']}")
-            st.markdown(f"**A{len(st.session_state.qa_history) - i}:** {qa['answer']}")
-            st.markdown("---")
-    
-    # Clear history button
-    if st.button("🗑️ Clear Chat History"):
-        st.session_state.qa_history = []
-        st.rerun()
-
-# Footer
-st.markdown("---")
-st.markdown(
-    "<div style='text-align: center; color: gray;'>"
-    "Built with Streamlit ❤️ | Powered by Google Gemini ⭐"
-    "</div>",
-    unsafe_allow_html=True
-)
+    # Handle real-time user chat inputs
+    if user_query := st.chat_input("Ask anything about the active document..."):
+        
+        # 1. Immediately display user prompt in chat window
+        with st.chat_message("user"):
+            st.markdown(user_query)
+        st.session_state.messages.append({"role": "user", "content": user_query})
+        
+        # 2. Generate and stream/display assistant response
+        with st.chat_message("assistant"):
+            with st.spinner("Searching document context & composing answer..."):
+                try:
+                    answer = query_document(
+                        st.session_state.collection,
+                        user_query,
+                        os.getenv("GOOGLE_API_KEY")
+                    )
+                    st.markdown(answer)
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                except Exception as e:
+                    st.error(f"Error yielding answer: {str(e)}")
