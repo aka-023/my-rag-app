@@ -64,10 +64,7 @@ pip install -r requirements.txt
 
 4. **Set up environment variables**:
 ```bash
-# Copy the example file
-cp .env.example .env
-
-# Edit .env and add your Google Gemini API key
+# make .env file in your project root and add your Google Gemini API key
 # GOOGLE_API_KEY=your_actual_api_key_here
 ```
 
@@ -80,9 +77,7 @@ streamlit run app.py
 
 2. **Open your browser** (usually auto-opens at `http://localhost:8501`)
 
-3. **Enter API Key** (in sidebar if not in .env file)
-
-4. **Upload a document**:
+3. **Upload a document**:
    - Click "Browse files" or drag & drop
    - Supported formats: PDF, DOCX, TXT
    - Max size: 10MB
@@ -104,7 +99,6 @@ rag-document-qa/
 ├── rag_engine.py          # Core RAG logic (chunking, retrieval, generation)
 ├── document_processor.py  # File parsing for PDF, DOCX, TXT
 ├── requirements.txt       # Python dependencies
-├── .env.example          # Environment variables template
 ├── .env                  # Your actual API key (don't commit!)
 └── README.md            # This file
 ```
