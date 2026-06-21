@@ -2,6 +2,8 @@ streamlit
 chromadb
 opentelemetry-exporter-otlp-proto-grpc>=1.40
 opentelemetry-proto>=1.40
+opentelemetry-exporter-otlp-proto-grpc>=1.40
+opentelemetry-proto>=1.40
 google-genai
 pypdf
 python-docx
